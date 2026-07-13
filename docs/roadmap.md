@@ -6,13 +6,16 @@ This roadmap describes the intended development of the home lab. It may change a
 
 - [x] Select initial hardware
 - [x] Purchase first compute node
+- [x] Backup drive available (Samsung Portable SSD T3 1 TB)
 - [ ] Receive and inspect the system
 - [ ] Verify hardware specifications
 - [ ] Test memory and storage
+- [ ] Record the initial hardware baseline
 - [ ] Install Proxmox VE
 - [ ] Configure the management network
+- [ ] Configure the Samsung T3 as backup storage
+- [ ] Establish and test a backup process
 - [ ] Create the first Linux virtual machine
-- [ ] Establish a backup process
 
 ## Phase 2: Core infrastructure
 
@@ -26,7 +29,7 @@ This roadmap describes the intended development of the home lab. It may change a
 ## Phase 3: Networking
 
 - [ ] Purchase a managed switch
-- [ ] Design VLAN structure
+- [ ] Design the VLAN structure
 - [ ] Separate management, server and test networks
 - [ ] Configure firewall rules
 - [ ] Connect the external Kali workstation
@@ -52,11 +55,11 @@ This roadmap describes the intended development of the home lab. It may change a
 ## Phase 6: Physical expansion
 
 - [ ] Purchase a second compute node
+- [ ] Test workloads across multiple physical hosts
 - [ ] Purchase a compact rack
 - [ ] Add mini-PC mounting hardware
 - [ ] Add structured cabling
 - [ ] Add a UPS
-- [ ] Add external backup storage
 
 ## Long-term ideas
 
