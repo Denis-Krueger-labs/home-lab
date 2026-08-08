@@ -17,8 +17,8 @@ Domain controller: DC01
 Domain: lab.test
 NetBIOS domain: LAB
 Client: CLIENT01
-Client IP: 10.20.0.20
-Domain controller IP: 10.20.0.10
+Client IP: <CLIENT_IP>
+Domain controller IP: <DC_IP>
 ```
 
 `CLIENT01` was already joined to the domain and its secure channel had been verified.
@@ -472,13 +472,13 @@ Remote laptop or Kali VM
 The VPN should provide controlled remote access to:
 
 ```text
-10.20.0.0/24
+<LAB_SUBNET>
 ```
 
 Access to the Proxmox management interface at:
 
 ```text
-192.168.178.53
+<PVE_MANAGEMENT_IP>
 ```
 
 may also be added through explicit firewall and routing rules.

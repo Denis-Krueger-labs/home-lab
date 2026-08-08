@@ -13,7 +13,7 @@ Proxmox VE 9.2 had already been installed on the internal 1 TB SSD.
 The system was reachable through the Proxmox web interface at:
 
 ```text
-https://192.168.178.53:8006
+https://<PVE_MANAGEMENT_IP>:8006
 ```
 
 The Dell correctly recognized the Intel Core i5-9500T, 32 GB RAM, the internal 1 TB SSD, and the Ethernet connection.
@@ -201,7 +201,7 @@ The following checks passed:
 The VM received:
 
 ```text
-192.168.178.57/24
+<TEMPLATE_HOST_IP>/24
 ```
 
 ## 11. Language Configuration

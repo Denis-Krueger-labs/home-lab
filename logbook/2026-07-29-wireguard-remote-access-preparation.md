@@ -13,13 +13,13 @@ The following infrastructure was already operational:
 
 ```text
 Proxmox node: pve
-Proxmox management IP: 192.168.178.53
+Proxmox management IP: <PVE_MANAGEMENT_IP>
 OPNsense firewall: fw01
-OPNsense WAN: 192.168.178.58
-OPNsense LAN: 10.20.0.1
-Lab network: 10.20.0.0/24
-Domain controller: 10.20.0.10
-Windows client: 10.20.0.20
+OPNsense WAN: <OPNSENSE_WAN_IP>
+OPNsense LAN: <LAB_GATEWAY>
+Lab network: <LAB_SUBNET>
+Domain controller: <DC_IP>
+Windows client: <CLIENT_IP>
 ```
 
 The intended remote-access path was:
@@ -46,21 +46,21 @@ IPsec may be tested later for site-to-site and enterprise VPN practice.
 A separate VPN subnet was selected:
 
 ```text
-10.30.0.0/24
+<WG_SUBNET>
 ```
 
 The initial addressing plan was:
 
 ```text
-OPNsense WireGuard instance: 10.30.0.1
-Laptop WireGuard client:     10.30.0.2
+OPNsense WireGuard instance: <WG_GATEWAY_IP>
+Laptop WireGuard client:     <WG_CLIENT_IP>
 ```
 
 This does not overlap with:
 
 ```text
-Lab network:  10.20.0.0/24
-Home network: 192.168.178.0/24
+Lab network:  <LAB_SUBNET>
+Home network: <MANAGEMENT_SUBNET>
 ```
 
 ## 4. WireGuard Instance Creation
@@ -71,7 +71,7 @@ A new instance was created in OPNsense:
 Name:           HomeLab-WG
 Device:         wg0
 Listen port:    51820
-Tunnel address: 10.30.0.1/24
+Tunnel address: <WG_GATEWAY_IP>/24
 MTU:            1420
 Enabled:        yes
 ```
@@ -117,7 +117,7 @@ Enabled:          yes
 Name:             Laptop
 Public key:       laptop public key
 Pre-shared key:   none
-Allowed IPs:      10.30.0.2/32
+Allowed IPs:      <WG_CLIENT_IP>/32
 Endpoint address: empty
 Endpoint port:    empty
 Instance:         HomeLab-WG
@@ -148,7 +148,7 @@ The active instance appeared as:
 ```text
 HomeLab-WG
 wg0
-10.30.0.1/24
+<WG_GATEWAY_IP>/24
 UDP 51820
 ```
 
@@ -175,7 +175,7 @@ Block private networks:     disabled
 Block bogon networks:       disabled
 ```
 
-The address `10.30.0.1/24` was not entered again because it is already owned by the WireGuard instance.
+The address `<WG_GATEWAY_IP>/24` was not entered again because it is already owned by the WireGuard instance.
 
 ## 11. WAN Firewall Rule
 
@@ -208,7 +208,7 @@ Direction:        in
 TCP/IP version:   IPv4
 Protocol:         any
 Source:           WireGuard client traffic
-Destination:      10.20.0.0/24
+Destination:      <LAB_SUBNET>
 Destination port: any
 Description:      Allow WireGuard clients to lab network
 ```
@@ -222,12 +222,12 @@ The laptop configuration was prepared as:
 ```ini
 [Interface]
 PrivateKey = <LAPTOP_PRIVATE_KEY>
-Address = 10.30.0.2/32
-DNS = 10.20.0.10
+Address = <WG_CLIENT_IP>/32
+DNS = <DC_IP>
 
 [Peer]
 PublicKey = <OPNSENSE_PUBLIC_KEY>
-AllowedIPs = 10.20.0.0/24, 10.30.0.0/24
+AllowedIPs = <LAB_SUBNET>, <WG_SUBNET>
 Endpoint = <PUBLIC_IP_OR_DDNS_NAME>:51820
 PersistentKeepalive = 25
 ```
@@ -241,7 +241,7 @@ The endpoint remains incomplete until a public IP address or DDNS hostname is av
 Its DNS server is:
 
 ```text
-10.20.0.10
+<DC_IP>
 ```
 
 which is `DC01`.
@@ -266,7 +266,7 @@ Remote connections cannot yet reach OPNsense because the FRITZ!Box still needs t
 Protocol:        UDP
 External port:   51820
 Internal device: OPNsense
-Internal IP:     192.168.178.58
+Internal IP:     <OPNSENSE_WAN_IP>
 Internal port:   51820
 ```
 
@@ -276,9 +276,9 @@ The intended path is:
 Remote laptop
 → public IP or DDNS hostname
 → FRITZ!Box UDP 51820
-→ OPNsense 192.168.178.58:51820
+→ OPNsense <OPNSENSE_WAN_IP>:51820
 → WireGuard
-→ 10.20.0.0/24
+→ <LAB_SUBNET>
 ```
 
 This step must be completed when access to the home FRITZ!Box is available.
@@ -297,7 +297,7 @@ Suitable IPv6 endpoint
 The endpoint must not use:
 
 ```text
-192.168.178.58
+<OPNSENSE_WAN_IP>
 ```
 
 for remote access because that is only OPNsense's private WAN address inside the home network.
@@ -307,13 +307,13 @@ for remote access because that is only OPNsense's private WAN address inside the
 The current VPN rule allows access only to:
 
 ```text
-10.20.0.0/24
+<LAB_SUBNET>
 ```
 
 Proxmox management is located at:
 
 ```text
-192.168.178.53
+<PVE_MANAGEMENT_IP>
 ```
 
 Remote Proxmox access has not yet been enabled.
@@ -386,13 +386,13 @@ When access to the FRITZ!Box is available:
 1. Confirm or reserve OPNsense's WAN address:
 
 ```text
-192.168.178.58
+<OPNSENSE_WAN_IP>
 ```
 
 2. Create the UDP forwarding rule:
 
 ```text
-51820 → 192.168.178.58:51820
+51820 → <OPNSENSE_WAN_IP>:51820
 ```
 
 3. Identify the public IP or configure MyFRITZ!/DDNS.
@@ -410,13 +410,13 @@ Endpoint = <PUBLIC_IP_OR_DDNS_NAME>:51820
 7. Test access to:
 
 ```text
-10.30.0.1
-10.20.0.1
-10.20.0.10
-10.20.0.20
+<WG_GATEWAY_IP>
+<LAB_GATEWAY>
+<DC_IP>
+<CLIENT_IP>
 ```
 
-8. Confirm DNS through `10.20.0.10`.
+8. Confirm DNS through `<DC_IP>`.
 
 9. Add a separate restricted rule for Proxmox if required.
 

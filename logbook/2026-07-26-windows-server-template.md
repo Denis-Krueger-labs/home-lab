@@ -138,7 +138,7 @@ This confirmed that the QEMU guest agent was running correctly.
 The Windows Server VM received:
 
 ```text
-192.168.178.55
+<TEMPLATE_HOST_IP>
 ```
 
 The server was connected directly to `vmbr0` during template preparation.

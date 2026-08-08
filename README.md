@@ -40,22 +40,22 @@ Remote laptop
     | Tailscale, currently working
     | WireGuard, prepared but not externally validated
     v
-Home network: 192.168.178.0/24
+Home network: <MANAGEMENT_SUBNET>
     |
-    +-- pve              192.168.178.53
+    +-- pve              <PVE_MANAGEMENT_IP>
     |     Proxmox VE 9.2
     |
-    +-- fw01 WAN         192.168.178.58
+    +-- fw01 WAN         <OPNSENSE_WAN_IP>
           OPNsense
               |
               | vmbr1
               v
-        Isolated lab network: 10.20.0.0/24
+        Isolated lab network: <LAB_SUBNET>
               |
-              +-- fw01 LAN     10.20.0.1
-              +-- dc01         10.20.0.10
+              +-- fw01 LAN     <LAB_GATEWAY>
+              +-- dc01         <DC_IP>
               |     AD DS, DNS, lab.test
-              +-- client01     10.20.0.20
+              +-- client01     <CLIENT_IP>
                     Windows 11 Enterprise
 ```
 
@@ -74,7 +74,7 @@ The Proxmox management interface is not exposed directly to the public internet.
 | Network | 1× Gigabit Ethernet |
 | Hypervisor | Proxmox VE 9.2 |
 | Hostname | `pve` |
-| Management address | `192.168.178.53` |
+| Management address | `<PVE_MANAGEMENT_IP>` |
 | Status | Operational |
 
 The system originally arrived with a defective memory module. The fault was isolated through hardware testing, the system was returned, and the repaired machine was verified with the full 32 GB configuration before Proxmox was installed.
@@ -99,9 +99,9 @@ Not every system is expected to run continuously. Resource allocation is adjuste
 | DNS domain | `lab.test` |
 | NetBIOS domain | `LAB` |
 | Domain controller | `DC01` |
-| Domain controller address | `10.20.0.10` |
+| Domain controller address | `<DC_IP>` |
 | First workstation | `CLIENT01` |
-| Workstation address | `10.20.0.20` |
+| Workstation address | `<CLIENT_IP>` |
 | Internal DNS | `DC01` |
 | External DNS forwarding | OPNsense |
 
@@ -136,9 +136,9 @@ Current networks:
 
 | Network | Purpose |
 |---|---|
-| `192.168.178.0/24` | Home and management network |
-| `10.20.0.0/24` | Isolated infrastructure and domain network |
-| `10.30.0.0/24` | Prepared WireGuard VPN network |
+| `<MANAGEMENT_SUBNET>` | Home and management network |
+| `<LAB_SUBNET>` | Isolated infrastructure and domain network |
+| `<WG_SUBNET>` | Prepared WireGuard VPN network |
 
 OPNsense provides routing, NAT, DHCP where required, DNS forwarding, and the firewall boundary between the home network and the internal lab.
 
@@ -149,8 +149,8 @@ A WireGuard road-warrior configuration has been prepared in OPNsense:
 ```text
 Instance:       HomeLab-WG
 Interface:      wg0
-Tunnel address: 10.30.0.1/24
-Laptop address: 10.30.0.2/32
+Tunnel address: <WG_GATEWAY_IP>/24
+Laptop address: <WG_CLIENT_IP>/32
 Listen port:    UDP 51820
 ```
 

@@ -14,9 +14,9 @@ The existing Proxmox management network used:
 
 ```text
 Bridge:  vmbr0
-Network: 192.168.178.0/24
-Node IP: 192.168.178.53
-Gateway: 192.168.178.1
+Network: <MANAGEMENT_SUBNET>
+Node IP: <PVE_MANAGEMENT_IP>
+Gateway: <HOME_GATEWAY>
 ```
 
 The Windows Server clone `dc01` initially used `vmbr0` and was connected directly to the normal home network.
@@ -176,7 +176,7 @@ vtnet0 → vmbr0
 The WAN interface used DHCP and received:
 
 ```text
-192.168.178.58/24
+<OPNSENSE_WAN_IP>/24
 ```
 
 This placed the OPNsense WAN interface on the normal home network.
@@ -206,7 +206,7 @@ vtnet1 → vmbr1
 The LAN interface was configured with:
 
 ```text
-IP address: 10.20.0.1
+IP address: <LAB_GATEWAY>
 Subnet:    /24
 Gateway:   none
 ```
@@ -216,8 +216,8 @@ IPv6 configuration was not added manually.
 The final interface state was:
 
 ```text
-LAN: 10.20.0.1/24
-WAN: 192.168.178.58/24
+LAN: <LAB_GATEWAY>/24
+WAN: <OPNSENSE_WAN_IP>/24
 ```
 
 ## 9. OPNsense DHCP Configuration
@@ -227,9 +227,9 @@ The DHCP server was enabled on the LAN interface.
 The DHCP range was configured as:
 
 ```text
-10.20.0.100
+<LAB_DHCP_START>
 to
-10.20.0.199
+<LAB_DHCP_END>
 ```
 
 The lower part of the subnet remains available for statically assigned infrastructure systems.
@@ -238,11 +238,11 @@ The planned addressing scheme is:
 
 | Address | System |
 |---|---|
-| 10.20.0.1 | fw01 |
-| 10.20.0.10 | dc01 |
-| 10.20.0.20 | client01 |
-| 10.20.0.30 | docker01 |
-| 10.20.0.40 | monitor01 |
+| <LAB_GATEWAY> | fw01 |
+| <DC_IP> | dc01 |
+| <CLIENT_IP> | client01 |
+| <LAB_HOST_01_IP> | docker01 |
+| <LAB_HOST_02_IP> | monitor01 |
 
 ## 10. OPNsense Initial Configuration Wizard
 
@@ -299,7 +299,7 @@ After booting, the server received an address from the OPNsense DHCP server.
 The OPNsense web interface was then reached from `dc01` at:
 
 ```text
-https://10.20.0.1
+https://<LAB_GATEWAY>
 ```
 
 This confirmed that `dc01` was connected to the isolated network.
@@ -309,7 +309,7 @@ This confirmed that `dc01` was connected to the isolated network.
 The following tests were run from `dc01`:
 
 ```powershell
-ping 10.20.0.1
+ping <LAB_GATEWAY>
 ping 1.1.1.1
 nslookup example.com
 ```
@@ -342,17 +342,17 @@ The Windows Server network adapter was changed from DHCP to a static configurati
 The final settings were:
 
 ```text
-IP address:      10.20.0.10
+IP address:      <DC_IP>
 Subnet mask:     255.255.255.0
-Default gateway: 10.20.0.1
-Preferred DNS:   10.20.0.1
+Default gateway: <LAB_GATEWAY>
+Preferred DNS:   <LAB_GATEWAY>
 ```
 
 The configuration was verified with:
 
 ```powershell
 ipconfig
-ping 10.20.0.1
+ping <LAB_GATEWAY>
 ping 1.1.1.1
 nslookup example.com
 ```
@@ -525,7 +525,7 @@ The server began using its own local DNS service:
 A DNS forwarder was configured on DC01:
 
 ```text
-10.20.0.1
+<LAB_GATEWAY>
 ```
 
 The resulting DNS path is:
@@ -556,7 +556,7 @@ nslookup -type=SRV _ldap._tcp.dc._msdcs.lab.test
 The results confirmed:
 
 ```text
-dc01.lab.test → 10.20.0.10
+dc01.lab.test → <DC_IP>
 ```
 
 External DNS resolution also succeeded.
@@ -576,22 +576,22 @@ This confirmed that domain clients should be able to discover the domain control
 
 ```text
 Home network
-192.168.178.0/24
+<MANAGEMENT_SUBNET>
         |
         | vmbr0
         |
 fw01 WAN
-192.168.178.58
+<OPNSENSE_WAN_IP>
         |
 OPNsense
         |
 fw01 LAN
-10.20.0.1
+<LAB_GATEWAY>
         |
         | vmbr1
         |
 dc01
-10.20.0.10
+<DC_IP>
 dc01.lab.test
 AD DS + DNS
 ```
@@ -665,8 +665,8 @@ The next planned task is to create the first domain-joined Windows client.
 ```text
 Target name: client01
 Network:     vmbr1
-Planned IP:  10.20.0.20
-DNS server:  10.20.0.10
+Planned IP:  <CLIENT_IP>
+DNS server:  <DC_IP>
 Domain:      lab.test
 ```
 

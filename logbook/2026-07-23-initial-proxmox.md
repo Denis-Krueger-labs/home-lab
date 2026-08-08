@@ -110,9 +110,9 @@ The installer suggested the following values:
 
 ```text
 Hostname:   pve.fritz.box
-IP address: 192.168.178.53/24
-Gateway:    192.168.178.1
-DNS server: 192.168.178.1
+IP address: <PVE_MANAGEMENT_IP>/24
+Gateway:    <HOME_GATEWAY>
+DNS server: <HOME_GATEWAY>
 ```
 
 I kept these values.
@@ -120,7 +120,7 @@ I kept these values.
 The Proxmox web interface is available at:
 
 ```text
-https://192.168.178.53:8006
+https://<PVE_MANAGEMENT_IP>:8006
 ```
 
 The static IP makes it easier to reach the system because the address does not change every time the Dell restarts.

@@ -4,9 +4,9 @@
 **Hypervisor:** Proxmox VE 9.2  
 **Firewall:** OPNsense `fw01`  
 **Remote Access:** Tailscale  
-**Internal Lab Network:** `10.20.0.0/24`  
-**Management Network:** `192.168.178.0/24`  
-**Initial Target:** Ubuntu Server `copyfail01` at `10.20.0.191`  
+**Internal Lab Network:** `<LAB_SUBNET>`  
+**Management Network:** `<MANAGEMENT_SUBNET>`  
+**Initial Target:** Ubuntu Server `copyfail01` at `<LAB_VM_IP>`  
 **Goal:** Allow secure SSH access from the physical Windows workstation into selected systems inside the isolated OPNsense lab network without installing Tailscale directly on the research targets.
 
 ## 1. Starting Point
@@ -22,33 +22,33 @@ Physical Windows workstation
         v
 Proxmox VE
 pve-home
-192.168.178.53
+<PVE_MANAGEMENT_IP>
         |
         | vmbr0
         v
 OPNsense fw01
-WAN: 192.168.178.58
-LAN: 10.20.0.1
+WAN: <OPNSENSE_WAN_IP>
+LAN: <LAB_GATEWAY>
         |
         | vmbr1
         v
 Isolated lab network
-10.20.0.0/24
+<LAB_SUBNET>
 ```
 
 The OPNsense interfaces were:
 
 ```text
-WAN       192.168.178.58/24
-LAN       10.20.0.1/24
-homelabWG 10.30.0.1/24
+WAN       <OPNSENSE_WAN_IP>/24
+LAN       <LAB_GATEWAY>/24
+homelabWG <WG_GATEWAY_IP>/24
 ```
 
 The Proxmox host was already reachable remotely through Tailscale:
 
 ```text
-pve-home     100.111.191.59
-denis-dell   100.120.76.52
+pve-home     <PVE_TAILSCALE_IP>
+<WORKSTATION>   <WORKSTATION_TAILSCALE_IP>
 ```
 
 The isolated lab itself was not yet routed through Tailscale.
@@ -57,7 +57,7 @@ The first SSH target was the new Ubuntu research VM:
 
 ```text
 Hostname: copyfail01
-Address:  10.20.0.191
+Address:  <LAB_VM_IP>
 User:     researcher
 SSH:      TCP/22
 ```
@@ -69,13 +69,13 @@ The VM was intentionally kept free of Tailscale or other remote-management softw
 SSH from the physical Windows machine initially failed:
 
 ```powershell
-ssh researcher@10.20.0.191
+ssh researcher@<LAB_VM_IP>
 ```
 
 Result:
 
 ```text
-ssh: connect to host 10.20.0.191 port 22: Connection timed out
+ssh: connect to host <LAB_VM_IP> port 22: Connection timed out
 ```
 
 Before debugging the network, the SSH service itself was verified from the Ubuntu console:
@@ -102,7 +102,7 @@ The next step was to determine whether OPNsense itself could reach the Ubuntu VM
 An ICMP test from OPNsense to:
 
 ```text
-10.20.0.191
+<LAB_VM_IP>
 ```
 
 succeeded.
@@ -110,24 +110,24 @@ succeeded.
 TCP connectivity was then tested directly from the OPNsense shell:
 
 ```bash
-nc -vz -w 3 10.20.0.191 22
+nc -vz -w 3 <LAB_VM_IP> 22
 ```
 
 Result:
 
 ```text
-Connection to 10.20.0.191 22 port [tcp/ssh] succeeded!
+Connection to <LAB_VM_IP> 22 port [tcp/ssh] succeeded!
 ```
 
 This proved that the following part of the network was healthy:
 
 ```text
 OPNsense LAN
-10.20.0.1
+<LAB_GATEWAY>
     |
     v
 copyfail01
-10.20.0.191:22
+<LAB_VM_IP>:22
 ```
 
 At this point the following components were known to work:
@@ -148,32 +148,32 @@ The Proxmox host initially had no route for the isolated network.
 The routing table contained:
 
 ```text
-default via 192.168.178.1 dev vmbr0
-192.168.178.0/24 dev vmbr0
+default via <HOME_GATEWAY> dev vmbr0
+<MANAGEMENT_SUBNET> dev vmbr0
 ```
 
 A lookup for the Ubuntu VM showed that Proxmox incorrectly attempted to send the traffic toward the home router:
 
 ```bash
-ip route get 10.20.0.191
+ip route get <LAB_VM_IP>
 ```
 
 Result:
 
 ```text
-10.20.0.191 via 192.168.178.1 dev vmbr0 src 192.168.178.53
+<LAB_VM_IP> via <HOME_GATEWAY> dev vmbr0 src <PVE_MANAGEMENT_IP>
 ```
 
 A temporary route was added through the OPNsense WAN address:
 
 ```bash
-ip route add 10.20.0.0/24 via 192.168.178.58 dev vmbr0
+ip route add <LAB_SUBNET> via <OPNSENSE_WAN_IP> dev vmbr0
 ```
 
 The routing decision then became:
 
 ```text
-10.20.0.191 via 192.168.178.58 dev vmbr0 src 192.168.178.53
+<LAB_VM_IP> via <OPNSENSE_WAN_IP> dev vmbr0 src <PVE_MANAGEMENT_IP>
 ```
 
 The route itself was therefore correct.
@@ -181,14 +181,14 @@ The route itself was therefore correct.
 However, TCP connections still timed out:
 
 ```bash
-nc -vz -w 3 10.20.0.191 22
+nc -vz -w 3 <LAB_VM_IP> 22
 ```
 
 Result:
 
 ```text
-10.20.0.191: inverse host lookup failed: Unknown host
-(UNKNOWN) [10.20.0.191] 22 (ssh) : Connection timed out
+<LAB_VM_IP>: inverse host lookup failed: Unknown host
+(UNKNOWN) [<LAB_VM_IP>] 22 (ssh) : Connection timed out
 ```
 
 The inverse-host-lookup warning was unrelated to the failure. It only indicated that no reverse DNS record existed for the target address.
@@ -200,29 +200,29 @@ Because even a direct ping from Proxmox to the OPNsense WAN address did not rece
 The ARP table contained:
 
 ```bash
-ip neigh show 192.168.178.58
+ip neigh show <OPNSENSE_WAN_IP>
 ```
 
 Result:
 
 ```text
-192.168.178.58 dev vmbr0 lladdr bc:24:11:e2:62:6c STALE
+<OPNSENSE_WAN_IP> dev vmbr0 lladdr <OPNSENSE_WAN_MAC> STALE
 ```
 
 ARP requests were then sent directly:
 
 ```bash
-arping -I vmbr0 -c 3 192.168.178.58
+arping -I vmbr0 -c 3 <OPNSENSE_WAN_IP>
 ```
 
 Result:
 
 ```text
-ARPING 192.168.178.58 from 192.168.178.53 vmbr0
+ARPING <OPNSENSE_WAN_IP> from <PVE_MANAGEMENT_IP> vmbr0
 
-Unicast reply from 192.168.178.58 [BC:24:11:E2:62:6C]
-Unicast reply from 192.168.178.58 [BC:24:11:E2:62:6C]
-Unicast reply from 192.168.178.58 [BC:24:11:E2:62:6C]
+Unicast reply from <OPNSENSE_WAN_IP> [<OPNSENSE_WAN_MAC>]
+Unicast reply from <OPNSENSE_WAN_IP> [<OPNSENSE_WAN_MAC>]
+Unicast reply from <OPNSENSE_WAN_IP> [<OPNSENSE_WAN_MAC>]
 
 Sent 3 probes
 Received 3 response(s)
@@ -239,21 +239,21 @@ Rather than continuing to change firewall settings blindly, the SSH connection w
 A capture was started on the Proxmox management bridge:
 
 ```bash
-tcpdump -ni vmbr0 'host 10.20.0.191 and tcp port 22'
+tcpdump -ni vmbr0 'host <LAB_VM_IP> and tcp port 22'
 ```
 
 The SSH test was triggered again:
 
 ```bash
-nc -vz -w 3 10.20.0.191 22
+nc -vz -w 3 <LAB_VM_IP> 22
 ```
 
 The capture showed:
 
 ```text
-192.168.178.53.59688 > 10.20.0.191.22: Flags [S]
-192.168.178.53.59688 > 10.20.0.191.22: Flags [S]
-192.168.178.53.59688 > 10.20.0.191.22: Flags [S]
+<PVE_MANAGEMENT_IP>.59688 > <LAB_VM_IP>.22: Flags [S]
+<PVE_MANAGEMENT_IP>.59688 > <LAB_VM_IP>.22: Flags [S]
+<PVE_MANAGEMENT_IP>.59688 > <LAB_VM_IP>.22: Flags [S]
 ```
 
 The repeated SYN packets proved that:
@@ -277,14 +277,14 @@ qm config 210 | grep '^net'
 Result:
 
 ```text
-net0: virtio=BC:24:11:E2:62:6C,bridge=vmbr0
+net0: virtio=<OPNSENSE_WAN_MAC>,bridge=vmbr0
 net1: virtio=BC:24:11:9D:14:CF,bridge=vmbr1
 ```
 
 The MAC address of `net0` matched the address discovered through ARP:
 
 ```text
-BC:24:11:E2:62:6C
+<OPNSENSE_WAN_MAC>
 ```
 
 This confirmed that:
@@ -297,14 +297,14 @@ net1 = OPNsense LAN
 Traffic was then captured directly on the Proxmox-side tap interface of the OPNsense WAN adapter:
 
 ```bash
-tcpdump -eni tap210i0 'host 10.20.0.191 and tcp port 22'
+tcpdump -eni tap210i0 'host <LAB_VM_IP> and tcp port 22'
 ```
 
 The capture showed:
 
 ```text
-00:4e:01:bc:7d:df > bc:24:11:e2:62:6c
-192.168.178.53.48490 > 10.20.0.191.22: Flags [S]
+00:4e:01:bc:7d:df > <OPNSENSE_WAN_MAC>
+<PVE_MANAGEMENT_IP>.48490 > <LAB_VM_IP>.22: Flags [S]
 ```
 
 This proved that the SSH SYN reached the virtual network adapter belonging to OPNsense.
@@ -329,7 +329,7 @@ OPNsense WAN adapter
 A packet capture was then performed directly inside OPNsense:
 
 ```bash
-tcpdump -ni vtnet0 'host 10.20.0.191 and tcp port 22'
+tcpdump -ni vtnet0 'host <LAB_VM_IP> and tcp port 22'
 ```
 
 The SYN appeared on `vtnet0`.
@@ -337,7 +337,7 @@ The SYN appeared on `vtnet0`.
 A second capture was started on the LAN interface:
 
 ```bash
-tcpdump -ni vtnet1 'host 10.20.0.191 and tcp port 22'
+tcpdump -ni vtnet1 'host <LAB_VM_IP> and tcp port 22'
 ```
 
 No corresponding packet appeared.
@@ -359,14 +359,14 @@ copyfail01          Never reached
 The packet-filter log was inspected directly:
 
 ```bash
-tcpdump -n -e -ttt -i pflog0 'host 10.20.0.191 and tcp port 22'
+tcpdump -n -e -ttt -i pflog0 'host <LAB_VM_IP> and tcp port 22'
 ```
 
 The result identified the blocking firewall rule:
 
 ```text
 rule 80/0(match): block in on vtnet0
-192.168.178.53 > 10.20.0.191.22
+<PVE_MANAGEMENT_IP> > <LAB_VM_IP>.22
 ```
 
 The active pf ruleset was then inspected:
@@ -384,7 +384,7 @@ Rule `@80` contained:
 The source address of Proxmox was:
 
 ```text
-192.168.178.53
+<PVE_MANAGEMENT_IP>
 ```
 
 which belongs to:
@@ -420,9 +420,9 @@ This option is useful when the WAN interface is connected directly to a public n
 In this lab, however, OPNsense WAN intentionally exists inside the private home network:
 
 ```text
-OPNsense WAN: 192.168.178.58
-Proxmox:      192.168.178.53
-Home LAN:     192.168.178.0/24
+OPNsense WAN: <OPNSENSE_WAN_IP>
+Proxmox:      <PVE_MANAGEMENT_IP>
+Home LAN:     <MANAGEMENT_SUBNET>
 ```
 
 Private RFC1918 traffic on the WAN interface is therefore expected.
@@ -444,14 +444,14 @@ The normal OPNsense firewall policy remained active.
 After disabling the inappropriate RFC1918 WAN block, the TCP test succeeded:
 
 ```bash
-nc -vz -w 3 10.20.0.191 22
+nc -vz -w 3 <LAB_VM_IP> 22
 ```
 
 Result:
 
 ```text
-10.20.0.191: inverse host lookup failed: Unknown host
-(UNKNOWN) [10.20.0.191] 22 (ssh) open
+<LAB_VM_IP>: inverse host lookup failed: Unknown host
+(UNKNOWN) [<LAB_VM_IP>] 22 (ssh) open
 ```
 
 The reverse lookup warning is harmless.
@@ -465,29 +465,29 @@ The important result was:
 SSH from Proxmox then succeeded:
 
 ```bash
-ssh researcher@10.20.0.191
+ssh researcher@<LAB_VM_IP>
 ```
 
 This confirmed the complete path:
 
 ```text
 PVE
-192.168.178.53
+<PVE_MANAGEMENT_IP>
         |
         v
 OPNsense WAN
-192.168.178.58
+<OPNSENSE_WAN_IP>
         |
         v
 OPNsense firewall
         |
         v
 OPNsense LAN
-10.20.0.1
+<LAB_GATEWAY>
         |
         v
 copyfail01
-10.20.0.191:22
+<LAB_VM_IP>:22
 ```
 
 ## 12. Tailscale Subnet Routing
@@ -498,19 +498,19 @@ The desired path was:
 
 ```text
 Windows workstation
-100.120.76.52
+<WORKSTATION_TAILSCALE_IP>
         |
         | Tailscale
         v
 pve-home
-100.111.191.59
-192.168.178.53
+<PVE_TAILSCALE_IP>
+<PVE_MANAGEMENT_IP>
         |
         v
 OPNsense
         |
         v
-10.20.0.0/24
+<LAB_SUBNET>
 ```
 
 Linux IP forwarding was initially disabled:
@@ -534,7 +534,7 @@ sysctl -w net.ipv4.ip_forward=1
 The Proxmox Tailscale client then advertised the complete internal lab network:
 
 ```bash
-tailscale set --advertise-routes=10.20.0.0/24
+tailscale set --advertise-routes=<LAB_SUBNET>
 ```
 
 The route was subsequently approved in the Tailscale administration interface.
@@ -542,7 +542,7 @@ The route was subsequently approved in the Tailscale administration interface.
 The advertised route covers the complete subnet:
 
 ```text
-10.20.0.0/24
+<LAB_SUBNET>
 ```
 
 rather than only the current Ubuntu VM.
@@ -552,17 +552,17 @@ rather than only the current Ubuntu VM.
 Connectivity was tested from the physical Windows workstation:
 
 ```powershell
-Test-NetConnection 10.20.0.191 -Port 22
+Test-NetConnection <LAB_VM_IP> -Port 22
 ```
 
 Result:
 
 ```text
-ComputerName     : 10.20.0.191
-RemoteAddress    : 10.20.0.191
+ComputerName     : <LAB_VM_IP>
+RemoteAddress    : <LAB_VM_IP>
 RemotePort       : 22
 InterfaceAlias   : Tailscale
-SourceAddress    : 100.120.76.52
+SourceAddress    : <WORKSTATION_TAILSCALE_IP>
 TcpTestSucceeded : True
 ```
 
@@ -571,7 +571,7 @@ This confirmed that Windows correctly selected Tailscale for the route.
 SSH then succeeded:
 
 ```powershell
-ssh researcher@10.20.0.191
+ssh researcher@<LAB_VM_IP>
 ```
 
 The first connection added the Ubuntu host key to the Windows SSH known-hosts database.
@@ -586,7 +586,7 @@ GNU/Linux 6.8.0-137-generic x86_64
 The Ubuntu system reported the previous connection as originating from:
 
 ```text
-192.168.178.53
+<PVE_MANAGEMENT_IP>
 ```
 
 This showed that the Tailscale subnet router was masquerading the connection through the Proxmox host.
@@ -595,27 +595,27 @@ The complete working path became:
 
 ```text
 Physical Windows workstation
-100.120.76.52
+<WORKSTATION_TAILSCALE_IP>
         |
         | Tailscale
         v
 pve-home
-100.111.191.59
-192.168.178.53
+<PVE_TAILSCALE_IP>
+<PVE_MANAGEMENT_IP>
         |
         | static route
         v
 fw01 WAN
-192.168.178.58
+<OPNSENSE_WAN_IP>
         |
         | OPNsense filtering
         v
 fw01 LAN
-10.20.0.1
+<LAB_GATEWAY>
         |
         v
 copyfail01
-10.20.0.191
+<LAB_VM_IP>
 ```
 
 ## 14. Persistent Proxmox Routing
@@ -631,25 +631,25 @@ The final `vmbr0` configuration contains:
 ```text
 auto vmbr0
 iface vmbr0 inet static
-        address 192.168.178.53/24
-        gateway 192.168.178.1
+        address <PVE_MANAGEMENT_IP>/24
+        gateway <HOME_GATEWAY>
         bridge-ports nic0
         bridge-stp off
         bridge-fd 0
-        post-up ip route replace 10.20.0.0/24 via 192.168.178.58 dev vmbr0
-        pre-down ip route del 10.20.0.0/24 via 192.168.178.58 dev vmbr0 || true
+        post-up ip route replace <LAB_SUBNET> via <OPNSENSE_WAN_IP> dev vmbr0
+        pre-down ip route del <LAB_SUBNET> via <OPNSENSE_WAN_IP> dev vmbr0 || true
 ```
 
 The route applies to the complete lab subnet:
 
 ```text
-10.20.0.0/24
+<LAB_SUBNET>
 ```
 
 and forwards it through:
 
 ```text
-192.168.178.58
+<OPNSENSE_WAN_IP>
 ```
 
 which is the OPNsense WAN interface.
@@ -689,7 +689,7 @@ The sysctl file ensures that forwarding is restored after reboot.
 Tailscale and Proxmox now know how to route the complete:
 
 ```text
-10.20.0.0/24
+<LAB_SUBNET>
 ```
 
 network.
@@ -702,10 +702,10 @@ The current OPNsense rule allows:
 
 ```text
 Source:
-192.168.178.53
+<PVE_MANAGEMENT_IP>
 
 Destination:
-10.20.0.191
+<LAB_VM_IP>
 
 Protocol:
 TCP
@@ -727,7 +727,7 @@ A connection to another internal VM can be routed correctly but will still be de
 For example:
 
 ```text
-10.20.0.42
+<LAB_SSH_HOST_IP>
 ```
 
 already belongs to the advertised and routed network.
@@ -735,7 +735,7 @@ already belongs to the advertised and routed network.
 However:
 
 ```powershell
-ssh user@10.20.0.42
+ssh user@<LAB_SSH_HOST_IP>
 ```
 
 should remain blocked until that machine is explicitly approved by firewall policy.
@@ -745,7 +745,7 @@ should remain blocked until that machine is explicitly approved by firewall poli
 Future Linux systems should not require additional Tailscale routes as long as they remain inside:
 
 ```text
-10.20.0.0/24
+<LAB_SUBNET>
 ```
 
 The existing route already covers the entire subnet.
@@ -767,16 +767,16 @@ Example:
 ```text
 SSH_MANAGED_HOSTS
 
-10.20.0.191    copyfail01
-10.20.0.30     linux01
-10.20.0.40     linux02
+<LAB_VM_IP>    copyfail01
+<LAB_HOST_01_IP>     linux01
+<LAB_HOST_02_IP>     linux02
 ```
 
 A single firewall rule could then permit:
 
 ```text
 Source:
-192.168.178.53
+<PVE_MANAGEMENT_IP>
 
 Destination:
 SSH_MANAGED_HOSTS
@@ -791,7 +791,7 @@ Port:
 This keeps management access explicit while avoiding an unrestricted rule such as:
 
 ```text
-192.168.178.53 -> 10.20.0.0/24 -> any
+<PVE_MANAGEMENT_IP> -> <LAB_SUBNET> -> any
 ```
 
 The latter would unnecessarily allow every service on every internal system.
@@ -811,7 +811,7 @@ This keeps the Ubuntu research VM closer to its intended baseline and avoids int
 The Proxmox host was not assigned an IP address inside:
 
 ```text
-10.20.0.0/24
+<LAB_SUBNET>
 ```
 
 Instead, it reaches the subnet through OPNsense.
@@ -879,8 +879,8 @@ The key evidence chain was:
 ```text
 SSH listening on copyfail01         Yes
 OPNsense -> copyfail01:22           Yes
-PVE route to 10.20.0.0/24           Yes
-ARP to 192.168.178.58               Yes
+PVE route to <LAB_SUBNET>           Yes
+ARP to <OPNSENSE_WAN_IP>               Yes
 SYN visible on vmbr0                Yes
 SYN visible on tap210i0             Yes
 SYN visible on OPNsense vtnet0      Yes
@@ -900,7 +900,7 @@ This located the failure precisely before configuration was changed.
 | OPNsense WAN | Working |
 | OPNsense LAN | Working |
 | Proxmox to OPNsense Layer 2 | Working |
-| Proxmox route to `10.20.0.0/24` | Working |
+| Proxmox route to `<LAB_SUBNET>` | Working |
 | Persistent Proxmox route | Configured |
 | Linux IPv4 forwarding | Enabled |
 | Persistent IPv4 forwarding | Configured |
@@ -921,36 +921,36 @@ This located the failure precisely before configuration was changed.
                             |
                             v
                        Home Router
-                      192.168.178.1
+                      <HOME_GATEWAY>
                             |
-                 192.168.178.0/24
+                 <MANAGEMENT_SUBNET>
                             |
           +-----------------+------------------+
           |                                    |
           v                                    v
 Physical Windows                        Proxmox VE
 Tailscale client                        pve-home
-100.120.76.52                           192.168.178.53
+<WORKSTATION_TAILSCALE_IP>                           <PVE_MANAGEMENT_IP>
           |                                    |
           +---------- Tailscale ---------------+
                                                |
                                                |
-                                   route 10.20.0.0/24
-                                      via 192.168.178.58
+                                   route <LAB_SUBNET>
+                                      via <OPNSENSE_WAN_IP>
                                                |
                                                v
                                          OPNsense fw01
-                                   WAN: 192.168.178.58
-                                   LAN: 10.20.0.1
+                                   WAN: <OPNSENSE_WAN_IP>
+                                   LAN: <LAB_GATEWAY>
                                                |
                                                |
-                                         10.20.0.0/24
+                                         <LAB_SUBNET>
                                                |
                            +-------------------+-------------------+
                            |                   |                   |
                            v                   v                   v
                          dc01              client01          copyfail01
-                     10.20.0.10          10.20.0.20        10.20.0.191
+                     <DC_IP>          <CLIENT_IP>        <LAB_VM_IP>
                                                                |
                                                                |
                                                             SSH/22
@@ -988,7 +988,7 @@ The remote-access architecture is now functional enough to support future lab wo
 New systems inside:
 
 ```text
-10.20.0.0/24
+<LAB_SUBNET>
 ```
 
 do not require new Tailscale advertisements or Proxmox routes.
@@ -1004,7 +1004,7 @@ The persistent route and sysctl configuration should be validated after the next
 The expected checks are:
 
 ```bash
-ip route get 10.20.0.191
+ip route get <LAB_VM_IP>
 ```
 
 ```bash
@@ -1018,7 +1018,7 @@ tailscale status
 The expected state is:
 
 ```text
-10.20.0.0/24 routed through 192.168.178.58
+<LAB_SUBNET> routed through <OPNSENSE_WAN_IP>
 net.ipv4.ip_forward = 1
 pve-home connected to Tailscale
 ```
@@ -1026,7 +1026,7 @@ pve-home connected to Tailscale
 A final Windows test can then confirm persistence:
 
 ```powershell
-Test-NetConnection 10.20.0.191 -Port 22
+Test-NetConnection <LAB_VM_IP> -Port 22
 ```
 
 ### 23.3 Copy Fail Research Lab
@@ -1050,7 +1050,7 @@ That report should include:
 
 This session extended the home lab from a locally isolated environment into a remotely manageable but still firewall-controlled research network.
 
-The physical workstation can now reach selected systems inside `10.20.0.0/24` through Tailscale, Proxmox performs subnet routing, and OPNsense remains responsible for deciding which internal hosts and services are actually accessible.
+The physical workstation can now reach selected systems inside `<LAB_SUBNET>` through Tailscale, Proxmox performs subnet routing, and OPNsense remains responsible for deciding which internal hosts and services are actually accessible.
 
 The troubleshooting process also identified and corrected an OPNsense WAN configuration mismatch caused by the lab's unusual but intentional private-WAN topology.
 

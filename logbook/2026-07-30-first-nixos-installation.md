@@ -269,7 +269,7 @@ NixOS retained the previous system generation, allowing rollback if the new conf
 
 The VM received the IPv4 address:
 
-    192.168.178.69/24
+    <NIXOS_VM_IP>/24
 
 The virtual network interface was detected as:
 
@@ -277,7 +277,7 @@ The virtual network interface was detected as:
 
 SSH access was tested from the Windows laptop using:
 
-    ssh labadmin@192.168.178.69
+    ssh labadmin@<NIXOS_VM_IP>
 
 The address had previously belonged to another SSH host.
 
@@ -285,7 +285,7 @@ The local SSH client therefore displayed a warning that the remote host identifi
 
 The obsolete entry was removed from the Windows `known_hosts` file using:
 
-    ssh-keygen -R 192.168.178.69
+    ssh-keygen -R <NIXOS_VM_IP>
 
 The new NixOS host fingerprint was then accepted and SSH login succeeded.
 

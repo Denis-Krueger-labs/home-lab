@@ -12,12 +12,12 @@ The following infrastructure was already available before creating the client:
 
 ```text
 Proxmox node: pve
-Management IP: 192.168.178.53
+Management IP: <PVE_MANAGEMENT_IP>
 Internal bridge: vmbr1
 OPNsense firewall: fw01
-OPNsense LAN: 10.20.0.1/24
+OPNsense LAN: <LAB_GATEWAY>/24
 Domain controller: DC01
-Domain controller IP: 10.20.0.10
+Domain controller IP: <DC_IP>
 Active Directory domain: lab.test
 NetBIOS domain: LAB
 ```
@@ -25,7 +25,7 @@ NetBIOS domain: LAB
 The isolated network used:
 
 ```text
-10.20.0.0/24
+<LAB_SUBNET>
 ```
 
 The first Windows 11 client was intended to become a domain-joined workstation inside this network.
@@ -90,7 +90,7 @@ The VM was attached directly to the isolated internal bridge:
 vmbr1
 ```
 
-This placed it behind OPNsense and inside the `10.20.0.0/24` lab subnet.
+This placed it behind OPNsense and inside the `<LAB_SUBNET>` lab subnet.
 
 ## 5. Installation Media Configuration
 
@@ -195,10 +195,10 @@ The Windows client was changed from DHCP to a static IPv4 configuration.
 The final settings were:
 
 ```text
-IP address:      10.20.0.20
+IP address:      <CLIENT_IP>
 Subnet mask:     255.255.255.0
-Default gateway: 10.20.0.1
-Preferred DNS:   10.20.0.10
+Default gateway: <LAB_GATEWAY>
+Preferred DNS:   <DC_IP>
 Alternate DNS:   none
 ```
 
@@ -217,9 +217,9 @@ Red Hat VirtIO Ethernet Adapter
 The adapter showed:
 
 ```text
-IPv4 address: 10.20.0.20
-Gateway:      10.20.0.1
-DNS server:   10.20.0.10
+IPv4 address: <CLIENT_IP>
+Gateway:      <LAB_GATEWAY>
+DNS server:   <DC_IP>
 ```
 
 Windows displayed the virtual link speed as:
@@ -235,7 +235,7 @@ This is the reported virtual adapter speed and does not represent the physical E
 The first connectivity test to the domain controller failed:
 
 ```powershell
-ping 10.20.0.10
+ping <DC_IP>
 ```
 
 The client reported:
@@ -244,7 +244,7 @@ The client reported:
 Destination host unreachable
 ```
 
-The ARP table contained an entry for OPNsense at `10.20.0.1`, but no entry for `10.20.0.10`.
+The ARP table contained an entry for OPNsense at `<LAB_GATEWAY>`, but no entry for `<DC_IP>`.
 
 The cause was that `DC01` was powered off.
 
@@ -269,12 +269,12 @@ Resolve-DnsName dc01.lab.test
 The result was:
 
 ```text
-dc01.lab.test → 10.20.0.10
+dc01.lab.test → <DC_IP>
 ```
 
 This confirmed that:
 
-* the client was using `10.20.0.10` as its DNS server,
+* the client was using `<DC_IP>` as its DNS server,
 * the `lab.test` zone was available,
 * and DC01 was reachable.
 
@@ -382,7 +382,7 @@ The user section did not yet show a custom user policy because no separate user-
 | Hostname | CLIENT01 |
 | Domain | lab.test |
 | Logged-in account | LAB\Administrator |
-| DNS server | 10.20.0.10 |
+| DNS server | <DC_IP> |
 | DC resolution | Successful |
 | Secure channel | True |
 | Computer object | Present in CN=Computers |
@@ -447,27 +447,27 @@ The built-in domain Administrator account should not be used as a normal daily u
 
 ```text
 Home network
-192.168.178.0/24
+<MANAGEMENT_SUBNET>
         |
         | vmbr0
         |
 fw01 WAN
-192.168.178.58
+<OPNSENSE_WAN_IP>
         |
 OPNsense
         |
 fw01 LAN
-10.20.0.1
+<LAB_GATEWAY>
         |
         | vmbr1
         |
         ├── DC01
-        |   10.20.0.10
+        |   <DC_IP>
         |   dc01.lab.test
         |   AD DS + DNS
         |
         └── CLIENT01
-            10.20.0.20
+            <CLIENT_IP>
             client01.lab.test
             Windows 11 Enterprise
 ```
