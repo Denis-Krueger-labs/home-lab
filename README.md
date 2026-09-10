@@ -1,325 +1,209 @@
 # Home Lab
 
-> Building a tiny data center one component at a time, with room for useful infrastructure, security experiments, and unnecessary technical nonsense.
+> Building a tiny enterprise network in a Dell that absolutely did not consent to this much responsibility.
 
-This repository documents the design and development of my personal home lab.
 
-The lab gives me a controlled environment where I can build systems, break them, observe what happened, restore them, and try again without risking my main computer or home network. It also serves as a smaller prototype for infrastructure and security concepts that may later be used in the TTZ security test environment.
+This repository documents the design, construction, breakage, recovery and continued evolution of my personal home lab.
 
-Rather than presenting only a polished final result, this repository records the complete process, including hardware problems, setup decisions, configuration changes, failed attempts, fixes, checkpoints, and lessons learned.
+What started as a small virtualization node has gradually turned into a compact enterprise-style environment for identity services, Windows and Linux administration, network segmentation, defensive security research, controlled attack-and-defence exercises and reproducible security testing.
 
-## Current Status
+The goal is not just to show a polished end state. The repository also records decisions, failed attempts, rebuilds and the lessons learned while the lab grows.
 
-**Last updated:** 4 August 2026  
-**Current phase:** Core Windows infrastructure operational, network isolation established, remote access and recovery testing still in progress
+> **OPSEC note:** This is a public project. Internal addressing, hostnames, domain names, management paths, credentials, firewall rules and other operational details are intentionally omitted or generalized.
 
-The first node now runs a functional small enterprise-style lab behind a virtual OPNsense firewall.
+## Current state
 
-Completed milestones include:
+The lab is actively running and currently includes:
 
-- Dell OptiPlex node tested, repaired, and placed into operation
-- Proxmox VE 9.2 installed and updated
-- external backup storage and weekly backup job configured
-- reusable Debian 13 and Windows Server 2025 templates created
-- isolated virtual lab network created with OPNsense
-- Active Directory forest and DNS deployed for `lab.test`
-- Windows 11 Enterprise client joined to the domain
-- organizational units, users, security groups, and initial GPOs created
-- manual infrastructure checkpoints created before major network changes
-- WireGuard road-warrior configuration prepared in OPNsense
-- Tailscale remote access to the Proxmox host tested successfully
-- NixOS and Hyprland desktop prototype developed as the experimental **Mori OS** workstation
+- Proxmox VE as the virtualization platform
+- an isolated lab network behind a virtual firewall
+- an Active Directory environment
+- Windows Server and Windows workstation systems
+- reusable Windows and Linux VM templates
+- dedicated infrastructure and file services
+- Group Policy and internal DNS
+- a separated privileged-administration workflow currently being expanded
+- authenticated remote management without exposing the hypervisor directly to the public internet
+- external backup and recovery workflows
+- a NixOS-based Mori OS environment
+- MORI and Copy Fail security research inside controlled lab systems
 
-The original “first node and templates” stage is complete. The current priorities are backup restoration testing, remote-access hardening, continued Active Directory development, centralized monitoring, and documentation.
+The current focus is moving privileged administration away from normal workstation use and into a dedicated management path before expanding the attack-and-defence side of the lab.
 
-## Architecture at a Glance
+## Architecture
 
 ```text
-Remote laptop
-    |
-    | Tailscale, currently working
-    | WireGuard, prepared but not externally validated
-    v
-Home network: <MANAGEMENT_SUBNET>
-    |
-    +-- pve              <PVE_MANAGEMENT_IP>
-    |     Proxmox VE 9.2
-    |
-    +-- fw01 WAN         <OPNSENSE_WAN_IP>
-          OPNsense
-              |
-              | vmbr1
-              v
-        Isolated lab network: <LAB_SUBNET>
-              |
-              +-- fw01 LAN     <LAB_GATEWAY>
-              +-- dc01         <DC_IP>
-              |     AD DS, DNS, lab.test
-              +-- client01     <CLIENT_IP>
-                    Windows 11 Enterprise
+Home network
+     |
+     +-- Virtualization host
+            |
+            +-- Virtual firewall / routing
+                    |
+                    +-- Isolated lab network
+                           |
+                           +-- Identity services
+                           +-- Windows workstations
+                           +-- File / infrastructure services
+                           +-- Privileged admin workstation
+                           +-- NixOS / Mori OS environment
+                           +-- Temporary research targets
 ```
 
-The Proxmox management interface is not exposed directly to the public internet.
+The internal systems are placed behind a dedicated firewall instead of being treated as ordinary devices on the home network. This provides a controlled environment for infrastructure testing and later security exercises while keeping the public documentation intentionally high level.
 
-## First Node
+## Core capabilities
 
-| Component | Specification |
-|---|---|
-| Model | Dell OptiPlex 5070 Micro |
-| Processor | Intel Core i5-9500T |
-| CPU | 6 cores / 6 threads |
-| Memory | 32 GB RAM |
-| Internal storage | 1 TB SSD |
-| External backup storage | 1 TB USB drive |
-| Network | 1× Gigabit Ethernet |
-| Hypervisor | Proxmox VE 9.2 |
-| Hostname | `pve` |
-| Management address | `<PVE_MANAGEMENT_IP>` |
-| Status | Operational |
+### Virtualization and reproducibility
 
-The system originally arrived with a defective memory module. The fault was isolated through hardware testing, the system was returned, and the repaired machine was verified with the full 32 GB configuration before Proxmox was installed.
+The lab uses reusable VM templates and documented build procedures so environments can be rebuilt instead of becoming irreplaceable snowflakes.
 
-## Current Virtual Environment
+Current reusable bases include Windows Server and Debian systems, with additional purpose-built machines created from those foundations as needed.
 
-| VM ID | Name | Role | Status |
-|---:|---|---|---|
-| 100 | `debian-gold` | Debian 13 server template | Ready |
-| 110 | `windows-server-gold` | Windows Server 2025 template | Ready |
-| 111 | `nix01` | NixOS and Mori OS desktop prototype | Active development |
-| 200 | `dc01` | Active Directory domain controller and DNS | Operational |
-| 210 | `fw01` | OPNsense firewall and lab router | Operational |
-| 220 | `client01` | Windows 11 Enterprise domain client | Operational |
+### Active Directory lab
 
-Not every system is expected to run continuously. Resource allocation is adjusted according to the current experiment.
+The Windows environment currently provides:
 
-## Active Directory Environment
+- Active Directory Domain Services
+- internal DNS
+- domain-joined clients and servers
+- Group Policy
+- dedicated file services
+- a separate administrative workstation workflow
 
-| Item | Value |
-|---|---|
-| DNS domain | `lab.test` |
-| NetBIOS domain | `LAB` |
-| Domain controller | `DC01` |
-| Domain controller address | `<DC_IP>` |
-| First workstation | `CLIENT01` |
-| Workstation address | `<CLIENT_IP>` |
-| Internal DNS | `DC01` |
-| External DNS forwarding | OPNsense |
+The administrative design is being expanded so privileged work is separated from normal user activity before the lab moves further into Active Directory attack-and-defence exercises.
 
-Current organizational structure:
+Specific internal names, addresses and remote-management configuration are intentionally not published here.
 
-```text
-lab.test
-├── Domain Controllers
-│   └── DC01
-├── Workstations
-│   └── CLIENT01
-├── Servers
-├── Lab Users
-│   └── Nyx Valborne
-├── Groups
-│   └── GG-Lab-Users
-└── Service Accounts
-```
+## Mori OS, MORI and Copy Fail
 
-Initial Group Policy work includes separate workstation and user baselines. Domain login, secure-channel health, group membership, computer policy processing, and user policy processing have all been verified.
+And then there is the tiny guy carrying an unreasonable amount of responsibility.
 
-## Network Segmentation
+**Mori OS** is my NixOS-based workstation environment and one of the more experimental parts of the lab. It gives me a reproducible Linux environment for system configuration work, interface experiments and security tooling.
 
-Two Proxmox bridges currently separate management and lab traffic:
+The lab also supports development and testing around **Copy Fail** and **MORI**, including:
 
-| Bridge | Purpose |
-|---|---|
-| `vmbr0` | Home network, Proxmox management, and OPNsense WAN |
-| `vmbr1` | Isolated virtual lab network behind OPNsense |
+- controlled reproduction of Copy Fail / CVE-2026-31431
+- detection experiments
+- eBPF and userspace monitoring
+- mitigation testing
+- regression and validation runs
+- repeatable testing inside disposable or recoverable systems
 
-Current networks:
+MORI grew out of the Copy Fail research and now forms part of the defensive-security side of the lab, where detection and mitigation ideas can be tested without relying on production infrastructure.
 
-| Network | Purpose |
-|---|---|
-| `<MANAGEMENT_SUBNET>` | Home and management network |
-| `<LAB_SUBNET>` | Isolated infrastructure and domain network |
-| `<WG_SUBNET>` | Prepared WireGuard VPN network |
+So yes, one little NixOS system is currently carrying an operating-system project, kernel-security research and an eBPF security gremlin. It is doing its best.
 
-OPNsense provides routing, NAT, DHCP where required, DNS forwarding, and the firewall boundary between the home network and the internal lab.
+## Networking and isolation
 
-## Remote Access
+The lab separates normal home infrastructure from security-testing systems through a dedicated virtual firewall and isolated network design.
 
-A WireGuard road-warrior configuration has been prepared in OPNsense:
+That architecture provides a base for work involving:
 
-```text
-Instance:       HomeLab-WG
-Interface:      wg0
-Tunnel address: <WG_GATEWAY_IP>/24
-Laptop address: <WG_CLIENT_IP>/32
-Listen port:    UDP 51820
-```
+- firewall policy testing
+- network segmentation
+- Active Directory attack paths
+- intentionally vulnerable systems
+- malware-analysis environments
+- monitoring and detection
 
-The keys, peer configuration, interface assignment, and firewall rules are present. External handshake and routing tests are still pending.
+The public repository documents the design decisions and lessons learned without publishing the exact internal addressing scheme, routing configuration or firewall policy.
 
-Tailscale is currently used as the practical remote-management path. Connectivity between the Windows laptop and the Proxmox host `pve-home` has been verified without exposing the Proxmox web interface directly to the internet.
+## Remote management
 
-## Backup Configuration
+Remote administration is available through an authenticated private-access layer rather than exposing management interfaces directly to the public internet.
 
-The external backup drive is mounted at:
+The exact access path, device identities and management configuration are deliberately kept out of the public README.
 
-```text
-/mnt/pve/backup-ssd
-```
+## Backup and recovery
 
-The automatic backup job uses:
+The lab has external backup and recovery workflows for important virtual machines and configuration state.
 
-```text
-Schedule:    Sunday at 01:00
-Selection:   All virtual machines and containers
-Mode:        Snapshot
-Compression: ZSTD
-Retention:   Keep the last 3 backups
-```
+Backups, snapshots and rebuildable templates are used before larger infrastructure changes or destructive testing. Recovery matters as much as deployment: if I am going to deliberately break systems, I would also like the ability to un-break them afterwards.
 
-Manual backups and checkpoints have also been created for important milestones, including:
+Detailed retention settings, storage layout and recovery paths are intentionally not published here.
 
-- the generalized Windows Server template
-- the OPNsense baseline
-- the verified Active Directory configuration
-- the domain-joined Windows client
+## What works today
 
-A complete restore test and retention verification are still required before the backup process can be considered fully validated.
+- [x] virtualization host
+- [x] tested hardware baseline
+- [x] external backup workflow
+- [x] recurring VM backups
+- [x] reusable Windows Server template
+- [x] reusable Debian template
+- [x] virtual firewall and isolated lab networking
+- [x] Active Directory Domain Services
+- [x] internal DNS
+- [x] domain-joined Windows systems
+- [x] Group Policy
+- [x] dedicated file services
+- [x] private remote management
+- [x] NixOS / Mori OS environment
+- [x] Copy Fail and MORI security experiments
+- [ ] completed privileged-administration workflow
+- [ ] full restore validation and recovery documentation
 
-## Reusable Templates
+## Currently building
 
-### Debian 13 Server Template
+The immediate focus is the dedicated privileged-management path.
 
-```text
-VM ID:          100
-Proxmox name:   debian-gold
-Guest hostname: tmpl-debian
-```
+That includes:
 
-The template includes UEFI, q35, VirtIO devices, QEMU Guest Agent, Cloud-Init, SSH, sudo, and common command-line tools. It has no desktop environment and is intended for full clones such as Docker hosts, monitoring servers, and temporary Linux infrastructure.
+- separating privileged and everyday identities
+- administering directory services from a dedicated workstation
+- remote infrastructure administration through controlled management channels
+- validating administrative tooling and logging
+- preparing the environment for later attack-and-defence exercises
 
-### Windows Server 2025 Template
+Once that foundation is complete, the lab can lean harder into controlled security exercises rather than only building the infrastructure those exercises require.
 
-```text
-VM ID:        110
-Proxmox name: windows-server-gold
-Guest name:   WIN-SRV-TMPL
-```
+## Where this is going
 
-The template includes Windows Server 2025 Standard Evaluation with Desktop Experience, VirtIO drivers, QEMU Guest Agent, OpenSSH, current updates, TPM 2.0, UEFI, and Secure Boot support. It was generalized with Sysprep, backed up, and converted into a reusable Proxmox template before any server roles were installed.
+The roadmap is intentionally flexible, but the larger direction includes:
 
-## Mori OS Experiment
-
-VM 111, `nix01`, is used to develop a custom NixOS and Hyprland desktop called **Mori OS**.
-
-The current prototype includes:
-
-- declarative NixOS configuration
-- Hyprland with UWSM
-- custom Waybar controls
-- Quickshell panels integrated into a subway-themed desktop
-- live CPU and memory information
-- live Spotify metadata, artwork, and media controls through MPRIS
-- a custom Mori settings launcher
-- dark GTK configuration tools
-- a multi-window minimized-application drawer
-- Firefox, Obsidian, Visual Studio Code, Spotify, Discord, and common desktop tools
-
-The VM is a safe development target for a future native installation on a Dell XPS 16. Hardware-specific configuration, a login screen, notification support, and several remaining live widgets are still unfinished.
-
-Mori OS is an experimental personal project inside the lab, not a replacement for the core infrastructure environment.
-
-## What the Lab Is For
-
-The environment is being built for learning and experimentation with:
-
-- Proxmox and virtualization
-- Windows Server and Active Directory
-- Linux and Windows administration
-- network segmentation and firewalls
-- VPN and remote-access design
+- Active Directory attack-and-defence exercises
+- centralized logging and monitoring
+- malware-analysis infrastructure
+- intentionally vulnerable targets
+- detection engineering exercises
 - Docker and self-hosted services
-- monitoring and centralized logging
-- backup and recovery
-- CI/CD and infrastructure automation
-- defensive security engineering
-- controlled and authorized security testing
-- NixOS, Wayland, and desktop systems
-- dashboards, strange configurations, and personal experiments
+- Kubernetes
+- CI/CD
+- infrastructure automation
+- additional network segmentation
+- honeypots
+- additional physical nodes when the current Dell finally files for workers' compensation
 
-The Dell hosts infrastructure, services, clients, targets, monitoring, and recovery systems. Offensive testing systems normally remain external or are placed into explicitly isolated temporary networks.
+Not all of these systems need to run at the same time. The lab is meant to be rebuilt, rearranged and adapted depending on what I am learning or testing.
 
-## Current Priorities
+## Hardware
 
-1. Test restoration of a complete VM backup.
-2. Confirm automatic backup execution and retention.
-3. Finish and validate secure remote access.
-4. Continue Active Directory development with additional roles, policies, and test identities.
-5. Create the first Debian infrastructure clone and deploy containerized services.
-6. Add centralized monitoring and logging.
-7. Document the architecture, addressing plan, recovery process, and important decisions.
-8. Continue Mori OS only when a break from enterprise infrastructure is medically necessary.
+The lab is deliberately being built from small-form-factor hardware rather than a full rack of enterprise systems.
 
-The detailed and longer-term task list is maintained in the [roadmap](docs/roadmap.md).
+The current setup includes:
 
-## Planned Expansion
+- a compact x86 virtualization host
+- upgraded memory and local SSD storage
+- external backup storage
+- a small managed physical network footprint
 
-Later phases may include:
+Part of the fun is seeing how much useful infrastructure can fit inside one tiny Dell before adding more machines.
 
-- a reusable Windows 11 template
-- Docker and reverse-proxy infrastructure
-- Grafana, Prometheus, Loki, or Wazuh
-- controlled attack, detection, and recovery exercises
-- CI/CD runners and Ansible automation
-- a small Kubernetes environment
-- managed switching and VLANs
-- a second compute node
-- a compact rack and UPS
-- a dedicated status display
-- integration with a larger TTZ security test environment
+Exact device inventory and configuration details may be documented privately where publishing them would add operational detail without adding much educational value.
 
 ## Documentation
 
-- [Roadmap](docs/roadmap.md)
-- [Hardware inventory](docs/hardware-inventory.md)
-- [Logbook](logbook/)
+This repository is meant to document the process rather than only the finished result.
 
-The logbook contains dated reports for the hardware failure, Proxmox foundation, templates, OPNsense, Active Directory, Windows client, WireGuard preparation, NixOS, Hyprland, Mori Settings, and live desktop widgets. Sanitized NixOS configuration snapshots are stored under `nixos/`.
+- [Logbook](logbook/) records individual build sessions, failures and fixes.
+- [Hardware inventory](docs/hardware-inventory.md) tracks the physical lab equipment where appropriate for public documentation.
+- [Roadmap](docs/roadmap.md) tracks planned infrastructure and future experiments.
 
-## Repository Structure
+That means mistakes stay in the history too. A broken configuration that gets diagnosed and repaired is often more useful to document than a configuration that worked on the first try.
 
-```text
-home-lab/
-├── README.md
-├── docs/
-│   ├── hardware-inventory.md
-│   └── roadmap.md
-├── nixos/
-│   └── nix01/
-│       ├── base_config/
-│       ├── Config_26.07.30/
-│       └── config_daily/
-└── logbook/
-    ├── 2026-07-13-project-start.md
-    ├── 2026-07-15-first-issue.md
-    ├── 2026-07-23-initial-proxmox.md
-    ├── 2026-07-24-proxmox-foundation-and-debian-template.md
-    ├── 2026-07-26-windows-server-template.md
-    ├── 2026-07-27-opnsense-active-directory-setup-report.md
-    ├── 2026-07-28-windows-11-enterprise-client-domain-join.md
-    ├── 2026-07-28-active-directory-structure-users-groups-and-gpo.md
-    ├── 2026-07-29-wireguard-remote-access-preparation.md
-    ├── 2026-07-30-first-nixos-installation.md
-    ├── 2026-07-30-first-hyprland-desktop.md
-    ├── 2026-07-31-nixos-hyprland-mori-desktop.md
-    ├── 2026-07-31-mori-os-daily-driver-milestone.md
-    ├── 2026-08-01-mori-settings-control-node.md
-    └── 2026-08-02-mori-os-live-widgets-and-window-drawer.md
-```
+## Security and ethics
 
-Sanitized configuration snapshots are included for `nix01`, and additional reusable configuration files and scripts may be added as the lab develops. Passwords, tokens, private keys, recovery secrets, and unfiltered configuration exports must never be committed.
+This environment is intended exclusively for authorized education, experimentation and security research.
 
-## Disclaimer
+Vulnerable services, offensive-security tooling, malware samples and exploit research are only used in systems that I own or am explicitly authorized to test. Potentially dangerous experiments are designed to stay inside controlled and isolated environments.
 
-This environment is intended exclusively for authorized education, experimentation, system administration, and security research.
-
-Vulnerable services, malware samples, and offensive-security tools will only be used in isolated systems owned and controlled by the author. The lab must not be used to access, test, or interfere with systems without explicit authorization.
+The point of the lab is to learn how systems fail, how those failures can be detected, and how the systems can be made harder to break the next time.
